@@ -1,3 +1,17 @@
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+First of all a huge **thanks to dougie996** - author of the [M1N1MaraX initial code](https://github.com/dougie996/M1N1MaraX_Web) that I forked
+
+This fork has a few modifications to support:
+	
+ 	* ESP32 boards
+  	* SPI Oled display (1,3'') with 7 pin, using the library Adafruit_SH110X.h
+   	* MQTT Client authentication with username and password (mandatory for Home Assistant MQTT Mosquito broker)
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+From original README of M1N1MaraX repository:
+
 This is a quick and dirty implementation of a Display and MQTT Client for Lelit MaraX V2 Espresso Machines.
 
 What it does: 
@@ -26,8 +40,6 @@ After brewing sequence has ended, the Display returns to idle Mode.
 4. Configuration can primarily be done via the secrets.h file.
    It contains Parameters like WiFi SSID and Password and MQTT Server Address & Port. You can also define the MQTT Update Interval in seconds.
    You need to match this based on your requirements.
-
-   
 
 Despite many other similar projects, this one is using the correct Mara X V2 wiring and coding!
 Please TAKE CARE, as most information in the Web regarding how to interface with Mara X Gicar Control Box is WRONG! 
