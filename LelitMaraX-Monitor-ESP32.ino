@@ -40,8 +40,9 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 #define BUFFER_SIZE 32
 
 // Serial for MaraX
-#define D5 (34)             // D5 is Rx Pin
-#define D6 (35)             // D6 is Tx Pin
+#define D5 (21)             // D5 is Rx Pin
+#define D6 (19)             // D6 is Tx Pin
+// GND is on Pin 20 (in between)
 #define INVERSE_LOGIC true  // Use inverse logic for MaraX V2
 
 
