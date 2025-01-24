@@ -1,40 +1,47 @@
+/* Copyright (C) 2025 Stefano Laguardia
+This file is partially based on M1N1MaraX_MQTT (https://github.com/dougie996/M1N1MaraX_MQTT).
 
-/* Copyright (C) 2024 Ralf Grafe
-This file is partly based on MaraX-Shot-Monitor <https://github.com/Anlieger/MaraX-Shot-Monitor>.
+LelitMaraX-Monitor-ESP32 is a free software you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by the Free Software Foundation, 
+either version 3 of the License, or (at your option) any later version.
 
-M1N1MaraX_MQTT is a free software you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-M1N1MaraX_MQTT is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+LelitMaraX-Monitor-ESP32 is based on M1N1MaraX_MQTT and is meant to help monitoring your Lelit
+MaraX V2 Coffee machine. It is distributed WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 */
 
 //Includes
+// SPI.h added to support oled SPI
+#include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_SH110X.h>
 #include <SoftwareSerial.h>
 #include <Timer.h>
 #include <Event.h>
 #include "bitmaps.h"
-#include <ESP8266WiFi.h>
+//WiFi lib for ESP32 based devices
+#include <WiFi.h>
 #include <ArduinoHttpClient.h>
 #include "secrets.h"
 #include <PubSubClient.h>
 
-//Definessss
+//Define screen resolution
 #define SCREEN_WIDTH 128  //Width in px
 #define SCREEN_HEIGHT 64  // Height in px
-#define OLED_RESET -1
-#define SCREEN_ADDRESS 0x3C  // or 0x3D Check datasheet or Oled Display
+
+// OLED pinout configuration
+#define OLED_MOSI   23
+#define OLED_CLK    18
+#define OLED_DC     16
+#define OLED_CS     5
+#define OLED_RESET  17
+
 #define BUFFER_SIZE 32
 
-#define D5 (14)             // D5 is Rx Pin
-#define D6 (12)             // D6 is Tx Pin
+// Serial for MaraX
+#define D5 (34)             // D5 is Rx Pin
+#define D6 (35)             // D6 is Tx Pin
 #define INVERSE_LOGIC true  // Use inverse logic for MaraX V2
 
 
@@ -49,7 +56,7 @@ bool timerStarted = false;
 long serialTimeout = 0;
 char buffer[BUFFER_SIZE];
 int bufferIndex = 0;
-int isMaraOff = 0;
+int isMaraOff = 1;
 long lastToggleTime = 0;
 int HeatDisplayToggle = 0;
 int pumpInValue = 0;
@@ -92,16 +99,17 @@ char msg[50];
 String maraData[7];
 
 //Instances
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+// Support display ssh110X:
+Adafruit_SH1106G display = Adafruit_SH1106G(128, 64, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 SoftwareSerial mySerial(D5, D6, INVERSE_LOGIC);  // Rx, Tx, Inverse_Logic
 Timer t;
 
 void setup() {
-  // Setup Display
-  display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS);
+  // Setup Display (SPI interface configuration)
+  display.begin(0, true);
   display.clearDisplay();
   display.display();
+  delay(2000);
   // Setup WiFi
   WiFi.begin(ssid, pass);
   WiFi.hostname("MaraX");
@@ -109,7 +117,7 @@ void setup() {
       delay(500);
     }
     // Setup Serial
-  Serial.begin(9600);       // Serial Monitor
+  Serial.begin(115200);       // Serial Monitor (ESP32)
   mySerial.begin(9600);     // MaraX Serial Interface
   Serial.println("WiFi connected");
     //mySerial.write(0x11);  // this is XON Flow Control Chr ... do not use. 
@@ -208,7 +216,8 @@ void reconnect() {
 
   while (!MQTT_CLIENT.connected()) {
     Serial.println("Connect to MQTT broker");
-    MQTT_CLIENT.connect("Kaffeemaschine_MQTT");
+    // Below line changed to include MQTT Username and password
+    MQTT_CLIENT.connect("MaraX_MQTT", MQTT_USER, MQTT_PASS);
 
     // Wait some time to space out connection requests
     delay(500);
@@ -324,7 +333,9 @@ void updateView() {
     Serial.println(serialTimeout);  // Inserted for debugging
   }
   display.clearDisplay();
-  display.setTextColor(WHITE);
+  //moddato per accomodare il colore bianco sul nuiovo display
+  display.setTextColor(SH110X_WHITE);
+
 
   if (isMaraOff == 1) {               // Mara OFF Message
     if (DEBUG == true) {
@@ -339,7 +350,8 @@ void updateView() {
   } else {                                // Mara is NOT off
     if (timerStarted) {                   // If timer was started
       // draw the timer on the right
-      display.fillRect(60, 9, 63, 55, BLACK);
+      // moddato per accomodare il display SH110
+      display.fillRect(60, 9, 63, 55, SH110X_BLACK);
       display.setTextSize(5);
       display.setCursor(68, 20);
       display.print(getTimer());          // Display Seconds on screen
@@ -348,28 +360,28 @@ void updateView() {
       if (tt >= 1) {
       // if (tt >= 1 && timerCount <= 23) {
         if (tt == 8) {
-          display.drawBitmap(17, 14, coffeeCup30_01, 30, 30, WHITE);
+          display.drawBitmap(17, 14, coffeeCup30_01, 30, 30, SH110X_WHITE);
           Serial.println(tt);
         } else if (tt == 7) {
-          display.drawBitmap(17, 14, coffeeCup30_02, 30, 30, WHITE);
+          display.drawBitmap(17, 14, coffeeCup30_02, 30, 30, SH110X_WHITE);
           Serial.println(tt);
         } else if (tt == 6) {
-          display.drawBitmap(17, 14, coffeeCup30_03, 30, 30, WHITE);
+          display.drawBitmap(17, 14, coffeeCup30_03, 30, 30, SH110X_WHITE);
           Serial.println(tt);
         } else if (tt == 5) {
-          display.drawBitmap(17, 14, coffeeCup30_04, 30, 30, WHITE);
+          display.drawBitmap(17, 14, coffeeCup30_04, 30, 30, SH110X_WHITE);
           Serial.println(tt);
         } else if (tt == 4) {
-          display.drawBitmap(17, 14, coffeeCup30_05, 30, 30, WHITE);
+          display.drawBitmap(17, 14, coffeeCup30_05, 30, 30, SH110X_WHITE);
           Serial.println(tt);
         } else if (tt == 3) {
-          display.drawBitmap(17, 14, coffeeCup30_06, 30, 30, WHITE);
+          display.drawBitmap(17, 14, coffeeCup30_06, 30, 30, SH110X_WHITE);
           Serial.println(tt);
         } else if (tt == 2) {
-          display.drawBitmap(17, 14, coffeeCup30_07, 30, 30, WHITE);
+          display.drawBitmap(17, 14, coffeeCup30_07, 30, 30, SH110X_WHITE);
           Serial.println(tt);
         } else if (tt == 1) {
-          display.drawBitmap(17, 14, coffeeCup30_08, 30, 30, WHITE);
+          display.drawBitmap(17, 14, coffeeCup30_08, 30, 30, SH110X_WHITE);
           Serial.println(tt);
         }
         if (tt == 1) {          // Loop
@@ -392,7 +404,7 @@ void updateView() {
       display.print("C");
     } else {
       //Coffee temperature and bitmap
-      display.drawBitmap(17, 14, coffeeCup30_00, 30, 30, WHITE);
+      display.drawBitmap(17, 14, coffeeCup30_00, 30, 30, SH110X_WHITE);
       if (maraData[3].toInt() < 100) {
         display.setCursor(19, 50);
       } else {
@@ -406,7 +418,7 @@ void updateView() {
       display.print("C");
 
       //Steam temperature and bitmap
-      display.drawBitmap(83, 14, steam30, 30, 30, WHITE);
+      display.drawBitmap(83, 14, steam30, 30, 30, SH110X_WHITE);
       if (maraData[1].toInt() < 100) {
         display.setCursor(88, 50);
       } else {
@@ -420,7 +432,7 @@ void updateView() {
       display.print("C");
 
       //Draw Line
-      display.drawLine(66, 14, 66, 64, WHITE);
+      display.drawLine(66, 14, 66, 64, SH110X_WHITE);
 
 
      
@@ -440,30 +452,30 @@ void updateView() {
           }
         }
         if (HeatDisplayToggle == 1) {
-          display.fillRect(0, 0, 12, 12, BLACK);
-          display.drawCircle(3, 3, 3, WHITE);
-          display.fillCircle(3, 3, 2, WHITE);
+          display.fillRect(0, 0, 12, 12, SH110X_BLACK);
+          display.drawCircle(3, 3, 3, SH110X_WHITE);
+          display.fillCircle(3, 3, 2, SH110X_WHITE);
 
         } else {
-          display.fillRect(0, 0, 12, 12, BLACK);
-          display.drawCircle(3, 3, 3, WHITE);
+          display.fillRect(0, 0, 12, 12, SH110X_BLACK);
+          display.drawCircle(3, 3, 3, SH110X_WHITE);
           // display.print("");
         }
       } else {
         display.print("");                                // Clear Heater Message
-        display.fillCircle(3, 3, 3, BLACK);
+        display.fillCircle(3, 3, 3, SH110X_BLACK);
       }
 
 
       // WiFi Signal
       if (MQTT_CLIENT.connected()) {
-      display.drawBitmap(60, 0, wifiicon, 12, 12, WHITE);       // Draw WiFi Icon upper center
+      display.drawBitmap(60, 0, wifiicon, 12, 12, SH110X_WHITE);       // Draw WiFi Icon upper center
       display.setCursor(75, 2);
       display.setTextSize(1);
       display.print(signalLevel);
       display.print("dB");
       }else {
-        display.fillRect(60, 0, 12, 12, BLACK);                 // Clear WiFi Icon when not connected
+        display.fillRect(60, 0, 12, 12, SH110X_BLACK);                 // Clear WiFi Icon when not connected
         display.setCursor(75, 2);
         display.print("       ");
       }
@@ -471,10 +483,10 @@ void updateView() {
       //Draw machine mode
       if (maraData[0].substring(0, 1) == "C") {                   // [0] = Mode & Version number - Check first Character if "C"
         // Coffee mode
-        display.drawBitmap(115, 0, coffeeCup12, 12, 12, WHITE);   // Draw Coffee Cup Icon upper right 
+        display.drawBitmap(115, 0, coffeeCup12, 12, 12, SH110X_WHITE);   // Draw Coffee Cup Icon upper right 
       } else {
         // Steam mode
-        display.drawBitmap(115, 0, steam12, 12, 12, WHITE);       // Draw Steam Icon upper right corner
+        display.drawBitmap(115, 0, steam12, 12, 12, SH110X_WHITE);       // Draw Steam Icon upper right corner
       }
 
 
