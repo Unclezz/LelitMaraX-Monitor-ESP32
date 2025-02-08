@@ -1,13 +1,16 @@
+
 /* Copyright (C) 2025 Stefano Laguardia
 This file is partially based on M1N1MaraX_MQTT (https://github.com/dougie996/M1N1MaraX_MQTT).
 
 LelitMaraX-Monitor-ESP32 is a free software you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by the Free Software Foundation, 
-either version 3 of the License, or (at your option) any later version.
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
 LelitMaraX-Monitor-ESP32 is based on M1N1MaraX_MQTT and is meant to help monitoring your Lelit
 MaraX V2 Coffee machine. It is distributed WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 */
 
 //Includes
@@ -16,7 +19,8 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
-#include <SoftwareSerial.h>
+// HardwareSerial is needed for PIN assignment on ESP32
+#include <HardwareSerial.h>
 #include <Timer.h>
 #include <Event.h>
 #include "bitmaps.h"
@@ -39,11 +43,10 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
 
 #define BUFFER_SIZE 32
 
-// Serial for MaraX
-#define D5 (21)             // D5 is Rx Pin
-#define D6 (19)             // D6 is Tx Pin
-// GND is on Pin 20 (in between)
-#define INVERSE_LOGIC true  // Use inverse logic for MaraX V2
+// Serial for MaraX --> Serial ESP32
+#define D5 (25)             // D5 is Rx Pin
+#define D6 (26)             // D6 is Tx Pin
+#define INVERT true  // Use inverse logic for MaraX V2, on HardwareSerial.h Lib
 
 
 #define DEBUG false
@@ -102,7 +105,8 @@ String maraData[7];
 //Instances
 // Support display ssh110X:
 Adafruit_SH1106G display = Adafruit_SH1106G(128, 64, OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
-SoftwareSerial mySerial(D5, D6, INVERSE_LOGIC);  // Rx, Tx, Inverse_Logic
+// Initializing the Serial UART on ESP32
+HardwareSerial mySerial(1);
 Timer t;
 
 void setup() {
@@ -119,7 +123,7 @@ void setup() {
     }
     // Setup Serial
   Serial.begin(115200);       // Serial Monitor (ESP32)
-  mySerial.begin(9600);     // MaraX Serial Interface
+  mySerial.begin(9600, SERIAL_8N1, D5, D6, INVERT);     // MaraX Serial Interface initialization for ESP32
   Serial.println("WiFi connected");
     //mySerial.write(0x11);  // this is XON Flow Control Chr ... do not use. 
   pinMode(LED_BUILTIN, OUTPUT);
